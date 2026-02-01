@@ -1,0 +1,89 @@
+{
+  "name": "@webtoolz/ts-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK that powers webtoolz.dev",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./json": {
+      "types": "./dist/json/index.d.ts",
+      "import": "./dist/json/index.js",
+      "require": "./dist/json/index.cjs"
+    },
+    "./share": {
+      "types": "./dist/share/index.d.ts",
+      "import": "./dist/share/index.js",
+      "require": "./dist/share/index.cjs"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests",
+    "prepublishOnly": "npm run build && npm run test"
+  },
+  "dependencies": {
+    "ajv": "^8.17.0",
+    "jsonc-parser": "^3.3.0",
+    "lz-string": "^1.5.0",
+    "microdiff": "^1.5.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  },
+  "keywords": [
+    "json",
+    "json-parser",
+    "json-formatter",
+    "json-validator",
+    "json-diff",
+    "json-schema",
+    "typescript",
+    "url-safe",
+    "compression",
+    "lz-string",
+    "webtoolz",
+    "utilities",
+    "sdk"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "webtoolz",
+    "url": "https://webtoolz.dev"
+  },
+  "homepage": "https://webtoolz.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/webtoolz-org/ts-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/webtoolz-org/ts-sdk/issues"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/webtoolz-org"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}
