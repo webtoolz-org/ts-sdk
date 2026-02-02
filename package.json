@@ -1,6 +1,6 @@
 {
   "name": "@webtoolz/ts-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript SDK that powers webtoolz.dev",
   "type": "module",
   "main": "./dist/index.cjs",
