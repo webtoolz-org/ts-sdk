@@ -30,29 +30,30 @@ export function compareJson(left: string, right: string): DiffResult {
   }
 
   try {
-    // microdiff doesn't handle root-level primitive comparisons
-    // If both values are primitives (not objects/arrays), compare directly
+    // Handle comparisons where at least one side is a primitive
+    // microdiff can only compare objects/arrays, not mixed types
     const leftData = leftResult.data;
     const rightData = rightResult.data;
 
-    if (
-      (leftData === null || typeof leftData !== "object") &&
-      (rightData === null || typeof rightData !== "object")
-    ) {
-      if (leftData !== rightData) {
-        return {
-          success: true,
-          differences: [
-            {
-              type: "update",
-              path: "/",
-              oldValue: leftData,
-              newValue: rightData,
-            },
-          ],
-        };
+    const leftIsPrimitive = leftData === null || typeof leftData !== "object";
+    const rightIsPrimitive = rightData === null || typeof rightData !== "object";
+
+    if (leftIsPrimitive || rightIsPrimitive) {
+      // If either side is primitive, compare via JSON.stringify for deep equality
+      if (JSON.stringify(leftData) === JSON.stringify(rightData)) {
+        return { success: true, differences: [] };
       }
-      return { success: true, differences: [] };
+      return {
+        success: true,
+        differences: [
+          {
+            type: "update",
+            path: "/",
+            oldValue: leftData,
+            newValue: rightData,
+          },
+        ],
+      };
     }
 
     const diffs = microdiff(
@@ -100,19 +101,22 @@ function convertDiff(diff: Difference): DiffEntry {
   }
 }
 
+/**
+ * Format a path array as a JSONPointer (RFC 6901).
+ * Escapes ~ as ~0 and / as ~1.
+ */
 function formatPath(pathArray: (string | number)[]): string {
   if (pathArray.length === 0) {
     return "/";
   }
-
-  return pathArray
-    .map((segment, index) => {
-      if (typeof segment === "number") {
-        return `[${segment}]`;
-      }
-      return index === 0 ? segment : `.${segment}`;
-    })
-    .join("");
+  return (
+    "/" +
+    pathArray
+      .map((segment) =>
+        String(segment).replace(/~/g, "~0").replace(/\//g, "~1")
+      )
+      .join("/")
+  );
 }
 
 /**

@@ -16,7 +16,13 @@ export { safeJsonParse, isValidJson, getJsonType } from "./parser";
 export { formatJson, minifyJson, beautifyJson, getJsonStats } from "./formatter";
 
 // Validator
-export { validateJson, validateJsonSchema } from "./validator";
+export {
+  validateJson,
+  validateJsonSchema,
+  clearSchemaCache,
+  addSchema,
+  removeSchema,
+} from "./validator";
 
 // Differ
 export { compareJson, formatDiffForDisplay } from "./differ";

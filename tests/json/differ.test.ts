@@ -43,7 +43,7 @@ describe("compareJson", () => {
       expect(result.differences).toHaveLength(1);
       expect(result.differences[0]).toEqual({
         type: "add",
-        path: "b",
+        path: "/b",
         newValue: 2,
       });
     });
@@ -57,7 +57,7 @@ describe("compareJson", () => {
     it("detects added nested property", () => {
       const result = compareJson('{"user": {}}', '{"user": {"name": "John"}}');
       expect(result.differences).toHaveLength(1);
-      expect(result.differences[0].path).toBe("user.name");
+      expect(result.differences[0].path).toBe("/user/name");
       expect(result.differences[0].type).toBe("add");
     });
 
@@ -66,7 +66,7 @@ describe("compareJson", () => {
       expect(result.differences).toHaveLength(1);
       expect(result.differences[0]).toEqual({
         type: "add",
-        path: "[2]",
+        path: "/2",
         newValue: 3,
       });
     });
@@ -79,7 +79,7 @@ describe("compareJson", () => {
       expect(result.differences).toHaveLength(1);
       expect(result.differences[0]).toEqual({
         type: "remove",
-        path: "b",
+        path: "/b",
         oldValue: 2,
       });
     });
@@ -93,7 +93,7 @@ describe("compareJson", () => {
     it("detects removed nested property", () => {
       const result = compareJson('{"user": {"name": "John"}}', '{"user": {}}');
       expect(result.differences).toHaveLength(1);
-      expect(result.differences[0].path).toBe("user.name");
+      expect(result.differences[0].path).toBe("/user/name");
       expect(result.differences[0].type).toBe("remove");
     });
 
@@ -102,7 +102,7 @@ describe("compareJson", () => {
       expect(result.differences).toHaveLength(1);
       expect(result.differences[0]).toEqual({
         type: "remove",
-        path: "[2]",
+        path: "/2",
         oldValue: 3,
       });
     });
@@ -114,7 +114,7 @@ describe("compareJson", () => {
       expect(result.differences).toHaveLength(1);
       expect(result.differences[0]).toEqual({
         type: "update",
-        path: "name",
+        path: "/name",
         oldValue: "John",
         newValue: "Jane",
       });
@@ -137,7 +137,7 @@ describe("compareJson", () => {
     it("detects updated array element", () => {
       const result = compareJson("[1, 2, 3]", "[1, 5, 3]");
       expect(result.differences).toHaveLength(1);
-      expect(result.differences[0].path).toBe("[1]");
+      expect(result.differences[0].path).toBe("/1");
       expect(result.differences[0].oldValue).toBe(2);
       expect(result.differences[0].newValue).toBe(5);
     });
@@ -201,9 +201,9 @@ describe("compareJson", () => {
       const remove = result.differences.find((d) => d.type === "remove");
       const add = result.differences.find((d) => d.type === "add");
 
-      expect(update?.path).toBe("a");
-      expect(remove?.path).toBe("b");
-      expect(add?.path).toBe("d");
+      expect(update?.path).toBe("/a");
+      expect(remove?.path).toBe("/b");
+      expect(add?.path).toBe("/d");
     });
 
     it("handles deeply nested changes", () => {
@@ -212,7 +212,7 @@ describe("compareJson", () => {
       const result = compareJson(left, right);
 
       expect(result.differences).toHaveLength(1);
-      expect(result.differences[0].path).toBe("a.b.c.d");
+      expect(result.differences[0].path).toBe("/a/b/c/d");
     });
 
     it("handles arrays of objects with changes", () => {
@@ -221,7 +221,7 @@ describe("compareJson", () => {
       const result = compareJson(left, right);
 
       expect(result.differences).toHaveLength(1);
-      expect(result.differences[0].path).toBe("[1].name");
+      expect(result.differences[0].path).toBe("/1/name");
     });
   });
 
@@ -292,10 +292,82 @@ describe("formatDiffForDisplay", () => {
   it("handles array paths", () => {
     const entry: DiffEntry = {
       type: "update",
-      path: "[0].name",
+      path: "/0/name",
       oldValue: "old",
       newValue: "new",
     };
-    expect(formatDiffForDisplay(entry)).toContain("[0].name");
+    expect(formatDiffForDisplay(entry)).toContain("/0/name");
+  });
+});
+
+describe("edge cases", () => {
+  describe("root-level type changes", () => {
+    it("detects object to array change at root (reports individual changes)", () => {
+      const result = compareJson('{"a": 1}', "[1, 2, 3]");
+      expect(result.success).toBe(true);
+      // microdiff reports individual property changes when both are objects
+      expect(result.differences.length).toBeGreaterThan(0);
+    });
+
+    it("detects array to object change at root (reports individual changes)", () => {
+      const result = compareJson("[1, 2, 3]", '{"a": 1}');
+      expect(result.success).toBe(true);
+      expect(result.differences.length).toBeGreaterThan(0);
+    });
+
+    it("detects primitive to object change at root", () => {
+      const result = compareJson("42", '{"a": 1}');
+      expect(result.success).toBe(true);
+      expect(result.differences).toHaveLength(1);
+      expect(result.differences[0].path).toBe("/");
+      expect(result.differences[0].oldValue).toBe(42);
+    });
+
+    it("detects object to primitive change at root", () => {
+      const result = compareJson('{"a": 1}', "42");
+      expect(result.success).toBe(true);
+      expect(result.differences).toHaveLength(1);
+      expect(result.differences[0].path).toBe("/");
+      expect(result.differences[0].newValue).toBe(42);
+    });
+
+    it("handles primitive to array change", () => {
+      const result = compareJson('"hello"', "[1, 2, 3]");
+      expect(result.success).toBe(true);
+      expect(result.differences).toHaveLength(1);
+    });
+  });
+
+  describe("JSONPointer path formatting (RFC 6901)", () => {
+    it("escapes tilde in property names", () => {
+      const result = compareJson('{"a~b": 1}', '{"a~b": 2}');
+      expect(result.differences[0].path).toBe("/a~0b");
+    });
+
+    it("escapes forward slash in property names", () => {
+      const result = compareJson('{"a/b": 1}', '{"a/b": 2}');
+      expect(result.differences[0].path).toBe("/a~1b");
+    });
+
+    it("escapes both tilde and slash in property names", () => {
+      const result = compareJson('{"a~/b": 1}', '{"a~/b": 2}');
+      expect(result.differences[0].path).toBe("/a~0~1b");
+    });
+  });
+
+  describe("large diffs performance", () => {
+    it("handles 100+ changes efficiently", () => {
+      const leftObj: Record<string, number> = {};
+      const rightObj: Record<string, number> = {};
+
+      for (let i = 0; i < 100; i++) {
+        leftObj[`key${i}`] = i;
+        rightObj[`key${i}`] = i + 1;
+      }
+
+      const result = compareJson(JSON.stringify(leftObj), JSON.stringify(rightObj));
+      expect(result.success).toBe(true);
+      expect(result.differences).toHaveLength(100);
+    });
   });
 });

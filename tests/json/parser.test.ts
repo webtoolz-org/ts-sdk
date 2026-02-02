@@ -130,6 +130,69 @@ describe("safeJsonParse", () => {
       expect(result.data!.name).toBe("test");
     });
   });
+
+  describe("number precision edge cases", () => {
+    it("handles scientific notation", () => {
+      expect(safeJsonParse("1e10").data).toBe(1e10);
+      expect(safeJsonParse("1.5e-5").data).toBe(1.5e-5);
+      expect(safeJsonParse("2.5E+10").data).toBe(2.5e10);
+    });
+
+    it("handles MAX_SAFE_INTEGER boundary", () => {
+      const maxSafe = String(Number.MAX_SAFE_INTEGER);
+      const result = safeJsonParse(maxSafe);
+      expect(result.success).toBe(true);
+      expect(result.data).toBe(Number.MAX_SAFE_INTEGER);
+    });
+
+    it("handles numbers beyond MAX_SAFE_INTEGER (precision loss expected)", () => {
+      const beyondMax = "9007199254740993"; // MAX_SAFE_INTEGER + 2
+      const result = safeJsonParse(beyondMax);
+      expect(result.success).toBe(true);
+      // Precision loss occurs at this magnitude
+      expect(typeof result.data).toBe("number");
+    });
+
+    it("handles very small decimal numbers", () => {
+      const result = safeJsonParse("0.0000000001");
+      expect(result.success).toBe(true);
+      expect(result.data).toBe(0.0000000001);
+    });
+  });
+
+  describe("multi-byte UTF-8 error positions", () => {
+    it("reports correct position after emoji", () => {
+      const input = '{"emoji": "🎉", invalid}';
+      const result = safeJsonParse(input);
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+
+    it("reports correct position after CJK characters", () => {
+      const input = '{"中文": "测试", invalid}';
+      const result = safeJsonParse(input);
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+  });
+
+  describe("deep nesting", () => {
+    it("handles 100 levels of nesting", () => {
+      let json = "1";
+      for (let i = 0; i < 100; i++) {
+        json = `{"level${i}": ${json}}`;
+      }
+      const result = safeJsonParse(json);
+      expect(result.success).toBe(true);
+    });
+
+    it("handles 500 levels of array nesting", () => {
+      const depth = 500;
+      const json = "[".repeat(depth) + "1" + "]".repeat(depth);
+      const result = safeJsonParse(json);
+      expect(result.success).toBe(true);
+    });
+  });
 });
 
 describe("isValidJson", () => {

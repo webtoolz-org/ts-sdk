@@ -163,3 +163,59 @@ describe("isShareableSize", () => {
     expect(isShareableSize(overLimit)).toBe(false);
   });
 });
+
+describe("boundary and edge case tests", () => {
+  describe("exactly 50KB boundary", () => {
+    it("accepts content at exactly 50KB minus overhead", () => {
+      // 50KB = 51200 bytes, minus ~30 byte wrapper overhead
+      const content = "a".repeat(51200 - 30);
+      const result = encode(content);
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects content at 50KB plus 1 byte", () => {
+      const content = "a".repeat(51200 + 1);
+      const result = encode(content);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("truncated/malformed encoded strings", () => {
+    it("handles truncated base64-like string", () => {
+      const result = decode("abc");
+      expect(result.success).toBe(false);
+    });
+
+    it("handles partially valid encoded data", () => {
+      const validEncoded = encode('{"test": true}').encoded!;
+      const truncated = validEncoded.slice(0, validEncoded.length / 2);
+      const result = decode(truncated);
+      expect(result.success).toBe(false);
+    });
+
+    it("handles random garbage characters", () => {
+      const result = decode("!@#$%^&*()");
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("version migration scenarios", () => {
+    it("handles v1 payload format correctly", () => {
+      const original = '{"data": "test"}';
+      const encoded = encode(original);
+      expect(encoded.success).toBe(true);
+
+      const decoded = decode(encoded.encoded!);
+      expect(decoded.success).toBe(true);
+      expect(decoded.json).toBe(original);
+    });
+
+    it("rejects unknown future versions", () => {
+      const futurePayload = JSON.stringify({ v: 99, d: '{"test": true}' });
+      const encoded = compressToEncodedURIComponent(futurePayload);
+      const result = decode(encoded);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Unsupported version");
+    });
+  });
+});

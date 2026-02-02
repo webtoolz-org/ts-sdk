@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { validateJson, validateJsonSchema } from "../../src/json/validator";
+import { describe, it, expect, beforeEach } from "vitest";
+import {
+  validateJson,
+  validateJsonSchema,
+  clearSchemaCache,
+  addSchema,
+  removeSchema,
+} from "../../src/json/validator";
 
 describe("validateJson", () => {
   describe("valid JSON", () => {
@@ -312,6 +318,151 @@ describe("validateJsonSchema", () => {
       expect(validateJsonSchema("[1, 2, 3]", schema).valid).toBe(true);
       expect(validateJsonSchema("[]", schema).valid).toBe(false);
       expect(validateJsonSchema("[1,2,3,4,5,6]", schema).valid).toBe(false);
+    });
+
+    it("validates oneOf constraint", () => {
+      const schema = `{
+        "oneOf": [
+          { "type": "number" },
+          { "type": "string" }
+        ]
+      }`;
+
+      expect(validateJsonSchema("42", schema).valid).toBe(true);
+      expect(validateJsonSchema('"hello"', schema).valid).toBe(true);
+      expect(validateJsonSchema("true", schema).valid).toBe(false);
+    });
+
+    it("validates anyOf constraint", () => {
+      const schema = `{
+        "anyOf": [
+          { "type": "number", "minimum": 0 },
+          { "type": "string", "minLength": 1 }
+        ]
+      }`;
+
+      expect(validateJsonSchema("42", schema).valid).toBe(true);
+      expect(validateJsonSchema('"hello"', schema).valid).toBe(true);
+      expect(validateJsonSchema("-1", schema).valid).toBe(false);
+    });
+
+    it("validates allOf constraint", () => {
+      const schema = `{
+        "allOf": [
+          { "type": "object", "required": ["a"] },
+          { "type": "object", "required": ["b"] }
+        ]
+      }`;
+
+      expect(validateJsonSchema('{"a": 1, "b": 2}', schema).valid).toBe(true);
+      expect(validateJsonSchema('{"a": 1}', schema).valid).toBe(false);
+    });
+
+    it("validates not constraint", () => {
+      const schema = `{
+        "not": { "type": "string" }
+      }`;
+
+      expect(validateJsonSchema("42", schema).valid).toBe(true);
+      expect(validateJsonSchema('"hello"', schema).valid).toBe(false);
+    });
+  });
+
+  describe("schema caching", () => {
+    beforeEach(() => {
+      clearSchemaCache();
+    });
+
+    it("uses cached schema for repeated validations", () => {
+      const schema = '{"type": "object"}';
+
+      // First validation compiles the schema
+      const result1 = validateJsonSchema('{"a": 1}', schema);
+      expect(result1.valid).toBe(true);
+
+      // Second validation should use cached schema
+      const result2 = validateJsonSchema('{"b": 2}', schema);
+      expect(result2.valid).toBe(true);
+    });
+
+    it("clears cache when clearSchemaCache is called", () => {
+      const schema = '{"type": "object"}';
+
+      validateJsonSchema('{"a": 1}', schema);
+      clearSchemaCache();
+
+      // Should recompile after cache clear
+      const result = validateJsonSchema('{"b": 2}', schema);
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe("$ref support", () => {
+    beforeEach(() => {
+      clearSchemaCache();
+    });
+
+    it("registers and uses schema with $ref", () => {
+      const addressSchema = {
+        $id: "address",
+        type: "object",
+        properties: {
+          street: { type: "string" },
+          city: { type: "string" },
+        },
+        required: ["street", "city"],
+      };
+
+      addSchema(addressSchema);
+
+      const personSchema = `{
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "address": { "$ref": "address" }
+        },
+        "required": ["name", "address"]
+      }`;
+
+      const validData = '{"name": "John", "address": {"street": "123 Main", "city": "Boston"}}';
+      const result = validateJsonSchema(validData, personSchema);
+      expect(result.valid).toBe(true);
+
+      const invalidData = '{"name": "John", "address": {"street": "123 Main"}}';
+      const result2 = validateJsonSchema(invalidData, personSchema);
+      expect(result2.valid).toBe(false);
+    });
+
+    it("registers schema from string", () => {
+      const schemaStr = '{"$id": "test-schema", "type": "string"}';
+      addSchema(schemaStr);
+
+      const mainSchema = '{"$ref": "test-schema"}';
+      expect(validateJsonSchema('"hello"', mainSchema).valid).toBe(true);
+    });
+
+    it("uses explicit id over $id", () => {
+      addSchema({ type: "number" }, "explicit-id");
+
+      const mainSchema = '{"$ref": "explicit-id"}';
+      expect(validateJsonSchema("42", mainSchema).valid).toBe(true);
+    });
+
+    it("throws error when schema has no id", () => {
+      expect(() => addSchema({ type: "string" })).toThrow(
+        "Schema must have $id or id parameter must be provided"
+      );
+    });
+
+    it("removes registered schema", () => {
+      addSchema({ $id: "removable", type: "string" });
+      removeSchema("removable");
+
+      // After removal, ref should fail
+      const mainSchema = '{"$ref": "removable"}';
+      const result = validateJsonSchema('"hello"', mainSchema);
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].keyword).toBe("schema");
     });
   });
 });

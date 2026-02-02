@@ -1,6 +1,21 @@
 import type { FormatOptions, JsonStats } from "./types";
 import { safeJsonParse } from "./parser";
 
+/**
+ * Check if an object contains circular references.
+ */
+function hasCircularReference(obj: unknown): boolean {
+  const seen = new WeakSet();
+  function detect(value: unknown): boolean {
+    if (value === null || typeof value !== "object") return false;
+    if (seen.has(value)) return true;
+    seen.add(value);
+    if (Array.isArray(value)) return value.some(detect);
+    return Object.values(value).some(detect);
+  }
+  return detect(obj);
+}
+
 const DEFAULT_OPTIONS: FormatOptions = {
   indentSize: 2,
   indentChar: "space",
@@ -28,6 +43,11 @@ export function formatJson(
     throw new Error("Invalid JSON input");
   }
 
+  // Check for circular references in non-string inputs
+  if (typeof input !== "string" && hasCircularReference(data)) {
+    throw new Error("Cannot format object with circular references");
+  }
+
   const indent = opts.indentChar === "tab" ? "\t" : " ".repeat(opts.indentSize);
 
   if (opts.sortKeys) {
@@ -49,6 +69,11 @@ export function minifyJson(input: string | unknown): string {
 
   if (data === undefined) {
     throw new Error("Invalid JSON input");
+  }
+
+  // Check for circular references in non-string inputs
+  if (typeof input !== "string" && hasCircularReference(data)) {
+    throw new Error("Cannot minify object with circular references");
   }
 
   return JSON.stringify(data);

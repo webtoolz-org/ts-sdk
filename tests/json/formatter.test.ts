@@ -115,6 +115,32 @@ describe("formatJson", () => {
       const result = formatJson('{"text":"line1\\nline2"}');
       expect(result).toContain("\\n");
     });
+
+    it("throws for circular references in object input", () => {
+      const obj: Record<string, unknown> = { a: 1 };
+      obj.self = obj;
+      expect(() => formatJson(obj)).toThrow("Cannot format object with circular references");
+    });
+
+    it("throws for deeply nested circular references", () => {
+      const obj: Record<string, unknown> = { a: { b: { c: {} } } };
+      (obj.a as Record<string, unknown>).b = obj;
+      expect(() => formatJson(obj)).toThrow("Cannot format object with circular references");
+    });
+
+    it("handles 100 levels of nesting", () => {
+      let json = "1";
+      for (let i = 0; i < 100; i++) {
+        json = `{"level${i}": ${json}}`;
+      }
+      const result = formatJson(json);
+      expect(result).toContain("level99");
+    });
+
+    it("preserves number precision", () => {
+      const result = formatJson('{"n": 1.23456789012345}');
+      expect(result).toContain("1.23456789012345");
+    });
   });
 });
 
@@ -144,6 +170,12 @@ describe("minifyJson", () => {
 
   it("throws for invalid JSON", () => {
     expect(() => minifyJson("{invalid}")).toThrow("Invalid JSON input");
+  });
+
+  it("throws for circular references in object input", () => {
+    const obj: Record<string, unknown> = { a: 1 };
+    obj.self = obj;
+    expect(() => minifyJson(obj)).toThrow("Cannot minify object with circular references");
   });
 });
 
