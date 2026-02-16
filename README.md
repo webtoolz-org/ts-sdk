@@ -22,7 +22,7 @@ yarn add @webtoolz/ts-sdk
 - **JSON Formatting** - Format, minify, beautify with configurable options
 - **JSON Validation** - Syntax validation and JSON Schema validation (via AJV)
 - **JSON Diffing** - Compare two JSON documents and get detailed differences
-- **URL-Safe Sharing** - Compress JSON to URL-safe strings using LZ compression
+- **Share Codec** - Generic compress/decompress for URL-safe payloads using LZ compression
 
 ## Usage
 
@@ -127,26 +127,35 @@ result.differences.forEach(diff => {
 // + c: 3
 ```
 
-### URL-Safe Sharing
+### Share Codec
+
+A generic codec for compressing any versioned payload into URL-safe strings. Used by JSON, Mermaid, and Music tools on webtoolz.dev.
 
 ```typescript
-import { encode, decode, isShareableSize } from "@webtoolz/ts-sdk/share";
+import { compress, decompress, fitsInPayload } from "@webtoolz/ts-sdk/share";
 
-// Encode JSON to URL-safe string
-const encoded = encode('{"data": "value"}');
-if (encoded.success) {
-  console.log(encoded.encoded); // Compressed URL-safe string
+// Define your domain payload (must have a `v` field)
+interface MyPayload {
+  v: 1;
+  data: string;
 }
 
-// Decode back to JSON
-const decoded = decode(encoded.encoded!);
+// Compress a payload to a URL-safe string
+const payload: MyPayload = { v: 1, data: "hello world" };
+const result = compress(JSON.stringify(payload));
+if (result.success) {
+  console.log(result.encoded); // Compressed URL-safe string
+}
+
+// Decompress back to a typed payload
+const decoded = decompress<MyPayload>(result.encoded);
 if (decoded.success) {
-  console.log(decoded.json); // '{"data": "value"}'
+  console.log(decoded.data); // { v: 1, data: "hello world" }
 }
 
-// Check size before sharing (max 50KB)
-isShareableSize('{"small": true}'); // true
-isShareableSize("a".repeat(60000)); // false
+// Check if content fits in a share payload (max 50KB with overhead)
+fitsInPayload('{"small": true}'); // true
+fitsInPayload("a".repeat(60000)); // false
 ```
 
 ## API Reference
@@ -171,9 +180,15 @@ isShareableSize("a".repeat(60000)); // false
 
 | Function | Description |
 |----------|-------------|
-| `encode(json)` | Compress JSON to URL-safe string (max 50KB) |
-| `decode(encoded)` | Decompress back to JSON (max 100KB) |
-| `isShareableSize(json)` | Check if within size limits |
+| `compress(payloadStr)` | Compress a JSON string to URL-safe string (max 50KB input) |
+| `decompress<T>(encoded)` | Decompress back to typed payload (max 100KB output, version check) |
+| `fitsInPayload(content)` | Check if content fits within size limits (accounting for wrapper overhead) |
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_PAYLOAD_SIZE` | 51200 | Maximum payload size before compression (50KB) |
+| `MAX_DECOMPRESSED_SIZE` | 102400 | Maximum decompressed size (100KB, zip bomb protection) |
+| `PAYLOAD_WRAPPER_OVERHEAD` | 30 | Approximate overhead of payload wrapper in bytes |
 
 ### Types
 
@@ -187,13 +202,14 @@ interface DiffResult { success: boolean; differences: DiffEntry[]; error?: strin
 interface DiffEntry { type: "add" | "remove" | "update"; path: string; oldValue?: unknown; newValue?: unknown }
 interface JsonStats { valid: boolean; size: number; minifiedSize: number; keys: number; depth: number; type: string }
 
-// Share Types
-interface EncodeResult { success: boolean; encoded?: string; error?: string }
-interface DecodeResult { success: boolean; json?: string; error?: string }
+// Share Codec Types
+type CompressResult = CompressSuccess | CompressFailure
+interface CompressSuccess { success: true; encoded: string }
+interface CompressFailure { success: false; error: string }
 
-// Constants
-const MAX_PAYLOAD_SIZE = 50 * 1024;  // 50KB
-const MAX_DECOMPRESSED_SIZE = 100 * 1024;  // 100KB
+type DecompressResult<T> = DecompressSuccess<T> | DecompressFailure
+interface DecompressSuccess<T> { success: true; data: T }
+interface DecompressFailure { success: false; error: string }
 ```
 
 ## Online Tools

@@ -28,14 +28,18 @@ export {
 // Share module
 export {
   // Types
-  type EncodeResult,
-  type DecodeResult,
-  type SharePayload,
+  type CompressResult,
+  type CompressSuccess,
+  type CompressFailure,
+  type DecompressResult,
+  type DecompressSuccess,
+  type DecompressFailure,
   // Constants
   MAX_PAYLOAD_SIZE,
   MAX_DECOMPRESSED_SIZE,
-  // Encoder
-  encode,
-  decode,
-  isShareableSize,
+  PAYLOAD_WRAPPER_OVERHEAD,
+  // Codec
+  compress,
+  decompress,
+  fitsInPayload,
 } from "./share";

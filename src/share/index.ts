@@ -1,6 +1,16 @@
-// Types
-export type { EncodeResult, DecodeResult, SharePayload } from "./types";
-export { MAX_PAYLOAD_SIZE, MAX_DECOMPRESSED_SIZE } from "./types";
-
-// Encoder
-export { encode, decode, isShareableSize } from "./encoder";
+export {
+  compress,
+  decompress,
+  fitsInPayload,
+  MAX_PAYLOAD_SIZE,
+  MAX_DECOMPRESSED_SIZE,
+  PAYLOAD_WRAPPER_OVERHEAD,
+} from "./codec";
+export type {
+  CompressResult,
+  CompressSuccess,
+  CompressFailure,
+  DecompressResult,
+  DecompressSuccess,
+  DecompressFailure,
+} from "./codec";
